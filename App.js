@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
-  SafeAreaView, StatusBar, BackHandler, Platform
+  SafeAreaView, StatusBar, BackHandler,
+  KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as SecureStore from 'expo-secure-store';
@@ -11,7 +12,6 @@ import * as Device from 'expo-device';
 
 const API_URL = 'https://blaudti.com.br';
 
-// Configura comportamento das notificações
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -20,37 +20,48 @@ Notifications.setNotificationHandler({
   }),
 });
 
-async function pedirPermissaoNotificacao() {
-  if (!Device.isDevice) return null;
-  const { status: atual } = await Notifications.getPermissionsAsync();
-  if (atual === 'granted') return 'granted';
-  const { status } = await Notifications.requestPermissionsAsync();
-  return status;
+async function pedirPermissao() {
+  if (!Device.isDevice) return;
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    await Notifications.requestPermissionsAsync();
+  }
 }
 
 export default function App() {
-  const [logado, setLogado] = useState(false);
-  const [verificando, setVerificando] = useState(true);
-  const [login, setLogin] = useState('');
-  const [senha, setSenha] = useState('');
-  const [carregando, setCarregando] = useState(false);
+  const [logado, setLogado]       = useState(false);
+  const [verificando, setVerif]   = useState(true);
+  const [login, setLogin]         = useState('');
+  const [senha, setSenha]         = useState('');
+  const [lembrar, setLembrar]     = useState(true);
+  const [carregando, setLoad]     = useState(false);
+  const [semInternet, setSemNet]  = useState(false);
+  const [webLoading, setWebLoad]  = useState(true);
   const webviewRef = useRef(null);
 
+  // Inicializa
   useEffect(() => {
-    // Pede permissão de notificação ao iniciar
-    pedirPermissaoNotificacao();
-
-    // Verifica sessão salva
-    SecureStore.getItemAsync('jwt_token').then(async t => {
-      if (t) {
-        const ok = await criarSessao(t);
-        setLogado(ok);
-      }
-      setVerificando(false);
-    });
+    pedirPermissao();
+    inicializar();
   }, []);
 
-  // Botao voltar Android navega na WebView
+  const inicializar = async () => {
+    // Carrega credenciais salvas
+    const loginSalvo = await SecureStore.getItemAsync('salvo_login');
+    const senhaSalva = await SecureStore.getItemAsync('salvo_senha');
+    if (loginSalvo) setLogin(loginSalvo);
+    if (senhaSalva) setSenha(senhaSalva);
+
+    // Verifica token
+    const token = await SecureStore.getItemAsync('jwt_token');
+    if (token) {
+      const ok = await criarSessao(token);
+      setLogado(ok);
+    }
+    setVerif(false);
+  };
+
+  // Botão voltar Android
   useEffect(() => {
     const onBack = () => {
       if (logado && webviewRef.current) {
@@ -83,101 +94,154 @@ export default function App() {
       Alert.alert('Atenção', 'Preencha login e senha.');
       return;
     }
-    setCarregando(true);
+    setLoad(true);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
       const resp = await fetch(API_URL + '/api/auth/login', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({login: login.trim(), senha})
+        body: JSON.stringify({login: login.trim(), senha}),
+        signal: controller.signal
       });
+      clearTimeout(timer);
       const data = await resp.json();
       if (data.token) {
+        // Salva token
         await SecureStore.setItemAsync('jwt_token', data.token);
-        await SecureStore.setItemAsync('ultimo_login', login.trim());
+        // Salva credenciais se "lembrar" ativo
+        if (lembrar) {
+          await SecureStore.setItemAsync('salvo_login', login.trim());
+          await SecureStore.setItemAsync('salvo_senha', senha);
+        } else {
+          await SecureStore.deleteItemAsync('salvo_login');
+          await SecureStore.deleteItemAsync('salvo_senha');
+        }
         await criarSessao(data.token);
         setLogado(true);
       } else {
         Alert.alert('Erro', data.erro || 'Credenciais inválidas.');
       }
-    } catch {
-      Alert.alert('Erro', 'Não foi possível conectar ao servidor.');
+    } catch (e) {
+      if (e.name === 'AbortError') {
+        Alert.alert('Tempo esgotado', 'O servidor não respondeu. Verifique sua conexão.');
+      } else {
+        Alert.alert('Erro', 'Não foi possível conectar ao servidor.');
+      }
     }
-    setCarregando(false);
+    setLoad(false);
   };
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('jwt_token');
-    setLogin('');
-    setSenha('');
+    // Mantém credenciais salvas para próximo login
     setLogado(false);
   };
 
-  // Carrega último login salvo
-  useEffect(() => {
-    SecureStore.getItemAsync('ultimo_login').then(u => {
-      if (u) setLogin(u);
-    });
-  }, []);
-
+  // Splash
   if (verificando) return (
     <View style={s.splash}>
       <Text style={s.logoGrande}>Blaud<Text style={s.blue}>TI</Text></Text>
-      <ActivityIndicator size="large" color="#4da6ff" style={{marginTop: 32}} />
+      <ActivityIndicator size="large" color="#3b82f6" style={{marginTop: 32}} />
     </View>
   );
 
+  // Tela de login
   if (!logado) return (
     <SafeAreaView style={s.container}>
       <StatusBar barStyle="light-content" backgroundColor="#09090b" />
-      <View style={s.loginWrap}>
-        <Text style={s.logoGrande}>Blaud<Text style={s.blue}>TI</Text></Text>
-        <Text style={s.subtitulo}>Painel de Gestão</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{flex: 1}}
+      >
+        <ScrollView
+          contentContainerStyle={s.loginWrap}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={s.logoGrande}>Blaud<Text style={s.blue}>TI</Text></Text>
+          <Text style={s.subtitulo}>Painel de Gestão</Text>
 
-        <View style={s.card}>
-          <Text style={s.label}>USUÁRIO</Text>
-          <TextInput
-            style={s.input}
-            placeholder="seu_usuario"
-            placeholderTextColor="#52525b"
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            textContentType="username"
-            value={login}
-            onChangeText={setLogin}
-          />
-          <Text style={s.label}>SENHA</Text>
-          <TextInput
-            style={s.input}
-            placeholder="••••••••"
-            placeholderTextColor="#52525b"
-            secureTextEntry
-            autoComplete="password"
-            textContentType="password"
-            value={senha}
-            onChangeText={setSenha}
-            onSubmitEditing={handleLogin}
-            returnKeyType="go"
-          />
-          <TouchableOpacity
-            style={[s.btn, carregando && s.btnDisabled]}
-            onPress={handleLogin}
-            disabled={carregando}
-            activeOpacity={0.8}
-          >
-            {carregando
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={s.btnText}>Entrar</Text>}
-          </TouchableOpacity>
-        </View>
-      </View>
+          <View style={s.card}>
+            <Text style={s.label}>USUÁRIO</Text>
+            <TextInput
+              style={s.input}
+              placeholder="seu_usuario"
+              placeholderTextColor="#52525b"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="username"
+              textContentType="username"
+              value={login}
+              onChangeText={setLogin}
+              returnKeyType="next"
+            />
+
+            <Text style={s.label}>SENHA</Text>
+            <TextInput
+              style={s.input}
+              placeholder="••••••••"
+              placeholderTextColor="#52525b"
+              secureTextEntry
+              autoComplete="current-password"
+              textContentType="password"
+              value={senha}
+              onChangeText={setSenha}
+              onSubmitEditing={handleLogin}
+              returnKeyType="go"
+            />
+
+            {/* Lembrar credenciais */}
+            <TouchableOpacity
+              style={s.lembrarRow}
+              onPress={() => setLembrar(!lembrar)}
+              activeOpacity={0.7}
+            >
+              <View style={[s.checkbox, lembrar && s.checkboxOn]}>
+                {lembrar && <Text style={s.checkmark}>✓</Text>}
+              </View>
+              <Text style={s.lembrarText}>Lembrar login e senha</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[s.btn, carregando && s.btnDisabled]}
+              onPress={handleLogin}
+              disabled={carregando}
+              activeOpacity={0.8}
+            >
+              {carregando
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={s.btnText}>Entrar</Text>}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 
-  // Painel web — sem barra superior, ocupa tela toda
+  // Sem internet
+  if (semInternet) return (
+    <SafeAreaView style={s.semNet}>
+      <Text style={s.semNetIcon}>📡</Text>
+      <Text style={s.semNetTxt}>Sem conexão com o servidor</Text>
+      <TouchableOpacity style={s.btn} onPress={() => {
+        setSemNet(false);
+        setWebLoad(true);
+        if (webviewRef.current) webviewRef.current.reload();
+      }}>
+        <Text style={s.btnText}>Tentar novamente</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+
+  // Painel web
   return (
     <SafeAreaView style={{flex:1, backgroundColor:'#09090b'}}>
       <StatusBar barStyle="light-content" backgroundColor="#09090b" />
+      {webLoading && (
+        <View style={s.webLoading}>
+          <ActivityIndicator size="large" color="#3b82f6" />
+        </View>
+      )}
       <WebView
         ref={webviewRef}
         source={{uri: API_URL + '/painel'}}
@@ -186,10 +250,17 @@ export default function App() {
         domStorageEnabled
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
+        onLoadStart={() => setWebLoad(true)}
+        onLoadEnd={() => setWebLoad(false)}
+        onError={() => setSemNet(true)}
+        onHttpError={(e) => {
+          if (e.nativeEvent.statusCode >= 500) setSemNet(true);
+        }}
         onShouldStartLoadWithRequest={(req) =>
           req.url.startsWith('https://blaudti.com.br') ||
           req.url.startsWith('about:')
         }
+        renderLoading={() => <View />}
       />
     </SafeAreaView>
   );
@@ -202,8 +273,8 @@ const s = StyleSheet.create({
   },
   container: { flex: 1, backgroundColor: '#09090b' },
   loginWrap: {
-    flex: 1, justifyContent: 'center',
-    alignItems: 'center', padding: 24
+    flexGrow: 1, justifyContent: 'center',
+    alignItems: 'center', padding: 24, paddingVertical: 48
   },
   logoGrande: {
     fontSize: 40, fontWeight: '800',
@@ -235,6 +306,19 @@ const s = StyleSheet.create({
     padding: 12, fontSize: 14,
     marginBottom: 16
   },
+  lembrarRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginBottom: 16, gap: 10
+  },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 4,
+    borderWidth: 1, borderColor: '#3b82f6',
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'transparent'
+  },
+  checkboxOn: { backgroundColor: '#3b82f6' },
+  checkmark: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  lembrarText: { color: '#71717a', fontSize: 13 },
   btn: {
     backgroundColor: '#3b82f6',
     borderRadius: 8, padding: 14,
@@ -242,4 +326,15 @@ const s = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  semNet: {
+    flex: 1, backgroundColor: '#09090b',
+    justifyContent: 'center', alignItems: 'center', padding: 32, gap: 16
+  },
+  semNetIcon: { fontSize: 48 },
+  semNetTxt: { color: '#71717a', fontSize: 16, textAlign: 'center', marginBottom: 8 },
+  webLoading: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#09090b', justifyContent: 'center', alignItems: 'center',
+    zIndex: 10
+  },
 });
