@@ -2,7 +2,7 @@
   "expo": {
     "name": "BlaudTI",
     "slug": "blaudti-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -11,6 +11,7 @@
     },
     "android": {
       "package": "br.com.blaudti.app",
+      "versionCode": 2,
       "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
       "adaptiveIcon": {
         "backgroundColor": "#1a2340"
