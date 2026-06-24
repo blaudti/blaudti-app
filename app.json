@@ -4,8 +4,10 @@
     "slug": "blaudti-app",
     "version": "1.2.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assets/splash.png",
       "backgroundColor": "#1a2340",
       "resizeMode": "contain"
     },
@@ -20,6 +22,7 @@
         "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a2340"
       }
     },
