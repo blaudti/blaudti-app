@@ -4,18 +4,8 @@
     "slug": "blaudti-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a2340"
-    },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a2340"
-      },
       "package": "br.com.blaudti.app",
       "permissions": [
         "NOTIFICATIONS",
@@ -23,16 +13,13 @@
         "VIBRATE",
         "INTERNET",
         "ACCESS_NETWORK_STATE"
-      ],
-      "googleServicesFile": "./google-services.json"
+      ]
     },
     "plugins": [
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#1a2340",
-          "sounds": []
+          "color": "#1a2340"
         }
       ]
     ],
