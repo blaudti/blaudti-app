@@ -2,7 +2,7 @@
   "expo": {
     "name": "BlaudTI",
     "slug": "blaudti-app",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "splash": {
@@ -11,12 +11,27 @@
     },
     "android": {
       "package": "br.com.blaudti.app",
-      "versionCode": 2,
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "versionCode": 3,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#1a2340"
       }
     },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#1a2340",
+          "sounds": []
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "f8c38151-e6f6-477e-9051-76dae6703169"
