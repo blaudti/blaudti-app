@@ -7,26 +7,11 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "br.com.blaudti.app",
-      "permissions": [
-        "NOTIFICATIONS",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE"
-      ]
+      "permissions": ["NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "VIBRATE", "INTERNET", "ACCESS_NETWORK_STATE"]
     },
-    "plugins": [
-      [
-        "expo-notifications",
-        {
-          "color": "#1a2340"
-        }
-      ]
-    ],
+    "plugins": [["expo-notifications", {"color": "#1a2340"}]],
     "extra": {
-      "eas": {
-        "projectId": "f8c38151-e6f6-477e-9051-76dae6703169"
-      },
+      "eas": {"projectId": "f8c38151-e6f6-477e-9051-76dae6703169"},
       "apiUrl": "https://blaudti.com.br"
     }
   }
