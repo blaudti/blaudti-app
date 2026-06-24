@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
@@ -12,16 +12,39 @@ const API_URL = 'https://blaudti.com.br';
 export default function App() {
   const [logado, setLogado] = useState(false);
   const [verificando, setVerificando] = useState(true);
+  const [sessaoOk, setSessaoOk] = useState(false);
   const [login, setLogin] = useState('');
   const [senha, setSenha] = useState('');
   const [carregando, setCarregando] = useState(false);
+  const webviewRef = useRef(null);
 
   useEffect(() => {
-    SecureStore.getItemAsync('jwt_token').then(t => {
-      setLogado(!!t);
+    SecureStore.getItemAsync('jwt_token').then(async t => {
+      if (t) {
+        // Já tem token — cria sessão Flask automaticamente
+        await criarSessao(t);
+        setLogado(true);
+      }
       setVerificando(false);
     });
   }, []);
+
+  const criarSessao = async (token) => {
+    try {
+      const resp = await fetch(API_URL + '/api/auth/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        }
+      });
+      if (resp.ok) {
+        setSessaoOk(true);
+      }
+    } catch {
+      // Sessão será criada quando a WebView carregar
+    }
+  };
 
   const handleLogin = async () => {
     if (!login || !senha) {
@@ -38,6 +61,7 @@ export default function App() {
       const data = await resp.json();
       if (data.token) {
         await SecureStore.setItemAsync('jwt_token', data.token);
+        await criarSessao(data.token);
         setLogado(true);
       } else {
         Alert.alert('Erro', data.erro || 'Credenciais invalidas');
@@ -50,6 +74,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('jwt_token');
+    setSessaoOk(false);
     setLogado(false);
   };
 
@@ -87,10 +112,21 @@ export default function App() {
         </TouchableOpacity>
       </View>
       <WebView
+        ref={webviewRef}
         source={{uri: API_URL + '/painel'}}
         style={{flex:1}}
         javaScriptEnabled
         domStorageEnabled
+        sharedCookiesEnabled
+        thirdPartyCookiesEnabled
+        onLoadEnd={() => {
+          // Injeta cookie de sessão se disponível
+          if (webviewRef.current) {
+            webviewRef.current.injectJavaScript(
+              "window.location.href = '" + API_URL + "/painel'; true;"
+            );
+          }
+        }}
       />
     </SafeAreaView>
   );
