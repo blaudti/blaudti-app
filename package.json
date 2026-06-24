@@ -21,16 +21,11 @@
     "axios": "^1.7.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.24.0",
-    "@types/react": "~18.2.79",
-    "typescript": "~5.3.3"
+    "@babel/core": "^7.24.0"
   },
   "expo": {
     "install": {
-      "exclude": [
-        "react-native",
-        "react-native-safe-area-context"
-      ]
+      "exclude": ["react-native", "react-native-safe-area-context"]
     }
   }
 }
