@@ -5,9 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1a2340",
+      "resizeMode": "contain"
+    },
     "android": {
       "package": "br.com.blaudti.app",
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"],
+      "adaptiveIcon": {
+        "backgroundColor": "#1a2340"
+      }
     },
     "extra": {
       "eas": {
